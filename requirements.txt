@@ -1,0 +1,12 @@
+# core
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+
+# module 02 / 03 / 04
+torch>=2.1
+scikit-learn>=1.3
+pandas>=2.0
+
+# optional (module 03, real MetaboLights data instead of the synthetic demo)
+# requests>=2.31

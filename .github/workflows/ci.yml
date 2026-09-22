@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy scipy matplotlib scikit-learn pandas
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Equivariance test (module 04)
+        run: python 04_se3_diffusion/equivariance_test.py
+
+      - name: MCMC demo (module 01)
+        run: python 01_mcmc_toy/run_demo.py
+
+      - name: Diffusion demo, short (module 02)
+        run: python 02_diffusion_toy/run_demo.py --steps 300
+
+      - name: Omics augmentation demo (module 03)
+        run: python 03_omics_synthesis/run_experiment.py --demo --seeds 0 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: figures/
+          if-no-files-found: warn

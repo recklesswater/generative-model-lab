@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# data (downloaded, never committed)
+data/
+03_omics_synthesis/data/
+
+# outputs: keep small demo figures, ignore the rest
+outputs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# checkpoints
+*.pt
+*.pth
+*.ckpt
