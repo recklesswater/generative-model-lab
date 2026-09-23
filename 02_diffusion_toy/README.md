@@ -33,6 +33,25 @@ python 02_diffusion_toy/run_demo.py --dataset eight_gaussians --steps 6000
   training steps and on the `--seed`; this is why the coverage table is printed rather than only
   plotted.
 
+### Update — `eight_gaussians`, 6000 steps (2026-09-22 evening run)
+
+Run: `python 02_diffusion_toy/run_demo.py --dataset eight_gaussians --steps 6000`
+Figures: `figures/02_diffusion_eight_gaussians.png`, `figures/02_trajectories_eight_gaussians.png`.
+
+| | widest sectors (truth 0.221 / 0.255) | rarest sectors (truth 0.008 / 0.018) |
+| --- | --- | --- |
+| DDPM, 6000 steps | 0.218 / 0.218 — near exact | 0.017 / 0.029 — still about 2x over-covered |
+
+* **No mode was dropped.** At this budget the failure is over-coverage of the tails, not the mode
+  collapse seen at 300 steps.
+* **Only one seed was run**, so "no mode loss" is not yet separated from seed luck; a multi-seed
+  repeat is the first item on the roadmap.
+* The tail bias does not shrink with longer training — it is the bias of a Gaussian-kernel
+  diffusion model at low dimension, not a training-time problem.
+
+Same lesson as the trace plots in module 01: **a healthy-looking loss curve is not evidence that
+the distribution is right.**
+
 ## Next
 
 * Add a small classifier-free guidance demo (`--skip` probability + guidance weight) on a

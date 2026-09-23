@@ -17,10 +17,19 @@ python 01_mcmc_toy/run_demo.py      # ~20 s on a laptop CPU
 
 ## How to read the output
 
-The double well has two minima at $x_0 = \pm a$ and a barrier of height $h a^4$
-(≈ 19.7 in energy units with the default parameters, i.e. $\exp(-19.7) \approx 3\times10^{-9}$
-of the probability mass sits on the barrier). A sampler that only proposes tiny steps will look
-perfectly stable and be completely wrong: it will sit in one well for the whole run.
+The double well has two minima at $x_0 = \pm a$ and a barrier of height $h a^4$, which is
+distance-measured in energy units. With the current defaults ($a = 1.5$, $h = 0.5$) the barrier is
+$h a^4 \approx 2.5$, i.e. $\exp(-2.5) \approx 8\%$ of the density at the well bottom - low enough
+that a tuned sampler does cross it, which is what makes the comparison below informative.
+
+> A note on that choice: the first version of this module used $a = 1.6$, $h = 3.0$ (barrier
+> $\approx 19.7$). With that barrier **none** of the three samplers crossed once in 200,000 steps,
+> so the demo showed nothing except that the problem was unsolvable at that budget. Lowering the
+> barrier keeps the two-mode structure while making the mixing differences measurable.
+
+A sampler that only proposes tiny steps will still look perfectly stable and be completely wrong:
+it will sit in one well for a very long stretch. That failure mode is the one the barrier scan at
+the end of the script re-creates deliberately.
 
 The summary table therefore reports, per sampler:
 
