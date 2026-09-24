@@ -64,6 +64,7 @@ def summarize(chains, target) -> list[dict]:
         x0 = chain.samples[:, 0]
         ess = effective_sample_size(x0)
         total_cost = chain.cost_per_step * chain.n_steps
+        hops = count_mode_hops(x0)
         rows.append({
             "sampler": chain.name,
             "steps": chain.n_steps,
@@ -72,7 +73,11 @@ def summarize(chains, target) -> list[dict]:
             "ESS per 1k steps": 1000.0 * effective_sample_size(x0) / chain.n_steps,
             "cost per step": chain.cost_per_step,
             "ESS per 1k evals": 1000.0 * ess / total_cost if total_cost else float("nan"),
-            "mode hops": count_mode_hops(x0),
+            "mode hops": hops,
+            # Absolute hop counts are not comparable across samplers: the three runs use
+            # different iteration budgets, and different cost per iteration. Rates are.
+            "hops per 1k steps": 1000.0 * hops / chain.n_steps,
+            "hops per 1k evals": 1000.0 * hops / total_cost if total_cost else float("nan"),
             "longest dwell": longest_well_residence(x0),
             "mean x0": float(x0.mean()),
             "std x0": float(x0.std(ddof=1)),

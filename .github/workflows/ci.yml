@@ -25,8 +25,11 @@ jobs:
       - name: Equivariance test (module 04)
         run: python 04_se3_diffusion/equivariance_test.py
 
-      - name: MCMC demo (module 01)
-        run: python 01_mcmc_toy/run_demo.py
+      - name: MCMC demo, 3 seeds (module 01)
+        run: python 01_mcmc_toy/run_demo.py --seeds 3
+
+      - name: MCMC one-step walkthrough + self-checks (module 01)
+        run: python 01_mcmc_toy/show_one_step.py
 
       - name: Diffusion demo, short (module 02)
         run: python 02_diffusion_toy/run_demo.py --steps 300

@@ -49,11 +49,15 @@ checked in a couple of minutes on a laptop CPU.
 
 ### 01 — MCMC: getting the operator language out of the head and onto the screen
 
-Random-walk Metropolis and MALA on a symmetric double-well potential: trace plots, autocorrelation,
-ESS, acceptance rate, and the number of barrier crossings. This is the "spectral gap" story told
-with pictures — mixing time is visible as a slow ACF decay, mode-hopping is visible as a trace that
-stalls in one well for thousands of steps, and MALA's gradient information shows up as a much higher
-acceptance rate *at the same step size*.
+Random-walk Metropolis, MALA and HMC on the same symmetric double-well potential: trace plots,
+autocorrelation, ESS, acceptance rate, and barrier-crossing **rates** rather than raw counts, with
+error bars over 10 seeds. This is the "spectral gap" story told with pictures — mixing time is
+visible as slow ACF decay, and mode hopping is what the gap is about. The headline result is
+deliberately anti-textbook: with a cheap 2D target, tuned RWM is the most cost-effective of the
+three (18.8 ± 1.0 ESS per 1k evaluations, against 3.6 and 3.5), while HMC crosses the barrier twice
+as often *per step* but pays 12 units of cost per iteration for the privilege. `show_one_step.py`
+prints one complete step of each sampler - every term of the acceptance ratio - and checks three
+invariants of the target, exiting non-zero if any of them fails.
 
 ### 02 — Diffusion: the same sampling problem, solved by learning a score
 

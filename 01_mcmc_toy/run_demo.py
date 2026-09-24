@@ -1,10 +1,20 @@
 """Run the three samplers on the double well and write the diagnostics to figures/.
 
-Usage:  python 01_mcmc_toy/run_demo.py
+Usage:
+    python 01_mcmc_toy/run_demo.py                # one seed: tables + figures (~20 s)
+    python 01_mcmc_toy/run_demo.py --seeds 5      # repeat the protocol, report mean +- sd
+    python 01_mcmc_toy/run_demo.py --seeds 5 --skip-figures
+
+Everything printed here is reproducible: the step sizes are tuned on one fixed pilot seed, and
+each replication re-uses a fixed seed layout. ``--seeds`` is the honest version of the table -
+a single seed has no error bar, and some of the differences below are smaller than the spread
+between seeds.
 """
 
 from __future__ import annotations
 
+import argparse
+import csv
 import sys
 from pathlib import Path
 
@@ -20,61 +30,147 @@ from diagnostics import autocorrelation, summarize  # noqa: E402
 from samplers import hamiltonian_monte_carlo, mala, random_walk_metropolis  # noqa: E402
 from targets import DoubleWell  # noqa: E402
 
-FIGDIR = Path(__file__).resolve().parent.parent / "figures"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+FIGDIR = REPO_ROOT / "figures"
+CSV_PATH = REPO_ROOT / "outputs_mcmc_summary.csv"
+
+# --------------------------------------------------------------------------------------
+# Budgets and the cost convention. These are *choices*, not facts - see the README
+# section "The cost convention". One log-density and one gradient both count as 1 unit.
+# --------------------------------------------------------------------------------------
+BUDGET = {"RWM": 200_000, "MALA": 200_000, "HMC": 50_000}
+N_LEAPFROG = 10
+COST_PER_STEP = {"RWM": 1.0, "MALA": 3.0, "HMC": float(N_LEAPFROG + 2)}
+
+STEP_GRID = {
+    "RWM": [0.2, 0.35, 0.5, 0.7, 1.0],
+    "MALA": [0.3, 0.45, 0.6, 0.8, 1.0],
+    "HMC": [0.15, 0.2, 0.25],
+}
+
+_SAMPLERS = {
+    "RWM": (random_walk_metropolis, {}),
+    "MALA": (mala, {}),
+    "HMC": (hamiltonian_monte_carlo, {"n_leapfrog": N_LEAPFROG}),
+}
 
 
-def main() -> None:
-    FIGDIR.mkdir(exist_ok=True)
-    target = DoubleWell()
-    print(f"target: {target.name}, barrier height = {target.barrier:.2f}")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the three samplers on the double well.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--seeds", type=int, default=1,
+                        help="how many replications of the whole protocol (default 1)")
+    parser.add_argument("--skip-figures", action="store_true",
+                        help="only print the tables and write the CSV")
+    return parser.parse_args()
 
-    # --- pilot: tune the step size of each sampler on a short run -------------
-    # Fair comparisons require tuned samplers, so each one gets a small budget to pick its
-    # step size by ESS per target evaluation (not per iteration - the costs differ).
-    def tune(fn, grid, n_pilot=20_000, **kw):
+
+def tune_step_sizes(target: DoubleWell, n_pilot: int = 20_000, pilot_seed: int = 11) -> dict:
+    """Pick each sampler's step size by ESS per target evaluation on a short pilot run.
+
+    Comparing untuned samplers says nothing, so every sampler gets the same kind of small
+    budget. The pilot seed is fixed and shared, so the tuned step sizes do not depend on the
+    replication seed - the spread across replications then measures sampling noise only.
+    """
+    tuned = {}
+    for kind, (sampler, extra) in _SAMPLERS.items():
         best, best_score = None, -np.inf
-        for step in grid:
-            chain = fn(target, n_steps=n_pilot, step_size=step, seed=11, **kw)
+        for step in STEP_GRID[kind]:
+            chain = sampler(target, n_steps=n_pilot, step_size=step, seed=pilot_seed, **extra)
             score = summarize([chain], target)[0]["ESS per 1k evals"]
             if score > best_score:
                 best, best_score = step, score
-        return best, best_score
+        tuned[kind] = best
+    return tuned
 
-    step_rwm, _ = tune(random_walk_metropolis, [0.2, 0.35, 0.5, 0.7, 1.0])
-    step_mala, _ = tune(mala, [0.3, 0.45, 0.6, 0.8, 1.0])
-    step_hmc, _ = tune(hamiltonian_monte_carlo, [0.15, 0.2, 0.25], n_leapfrog=10)
-    print(f"tuned step sizes: RWM {step_rwm}, MALA {step_mala}, HMC {step_hmc} (L = 10)")
 
-    chains = [
-        random_walk_metropolis(target, n_steps=200_000, step_size=step_rwm, seed=1),
-        mala(target, n_steps=200_000, step_size=step_mala, seed=2),
-        hamiltonian_monte_carlo(target, n_steps=50_000, step_size=step_hmc, n_leapfrog=10, seed=3),
+def run_replicate(target: DoubleWell, steps: dict, rep: int):
+    """One full set of three chains, with a fixed and reproducible seed layout."""
+    base = 10 * rep
+    return [
+        random_walk_metropolis(target, n_steps=BUDGET["RWM"], step_size=steps["RWM"],
+                               seed=base + 1),
+        mala(target, n_steps=BUDGET["MALA"], step_size=steps["MALA"], seed=base + 2),
+        hamiltonian_monte_carlo(target, n_steps=BUDGET["HMC"], step_size=steps["HMC"],
+                                n_leapfrog=N_LEAPFROG, seed=base + 3),
     ]
 
-    rows = summarize(chains, target)
-    width = max(len(r["sampler"]) for r in rows)
-    print("\n" + f"{'sampler':<{width}}  {'steps':>7}  {'accept':>7}  {'ESS(x0)':>8}  "
-          f"{'ESS/1k evals':>12}  {'hops':>5}  {'dwell':>6}  {'mean x0':>8}  {'sd x0':>7}")
+
+def print_efficiency_table(rows) -> None:
+    print("\nMixing (cost-aware):")
+    print(f"{'sampler':<8}{'steps':>9}{'cost/step':>11}{'accept':>9}"
+          f"{'ESS(x0)':>10}{'ESS/1k steps':>14}{'ESS/1k evals':>14}")
     for r in rows:
-        print(f"{r['sampler']:<{width}}  {r['steps']:>7}  {r['acceptance']:>7.3f}  "
-              f"{r['ESS(x0)']:>8.0f}  {r['ESS per 1k evals']:>12.1f}  "
-              f"{r['mode hops']:>5}  {r['longest dwell']:>6}  "
-              f"{r['mean x0']:>8.3f}  {r['std x0']:>7.3f}")
-    print("\nESS per 1k evals counts one log-density OR one gradient as one unit: RWM spends 1 per\n"
-          "iteration, MALA 3, HMC n_leapfrog + 2.")
+        print(f"{r['sampler']:<8}{r['steps']:>9,}{r['cost per step']:>11.1f}"
+              f"{r['acceptance']:>9.3f}{r['ESS(x0)']:>10.0f}"
+              f"{r['ESS per 1k steps']:>14.1f}{r['ESS per 1k evals']:>14.1f}")
+
+
+def print_exploration_table(rows) -> None:
+    print("\nExploration of the two wells "
+          "(absolute counts are not comparable - the budgets differ):")
+    print(f"{'sampler':<8}{'steps':>9}{'hops':>8}{'hops/1k steps':>15}"
+          f"{'hops/1k evals':>15}{'longest dwell':>15}")
+    for r in rows:
+        print(f"{r['sampler']:<8}{r['steps']:>9,}{r['mode hops']:>8,}"
+              f"{r['hops per 1k steps']:>15.1f}{r['hops per 1k evals']:>15.2f}"
+              f"{r['longest dwell']:>15,}")
+
+
+def print_seed_summary(all_rows) -> None:
+    """Mean +- sd across replications, for the numbers a reader is most likely to quote."""
+    print(f"\nAcross {len(all_rows)} seeds (mean +- sd over replications):")
+    print(f"{'sampler':<8}{'ESS(x0)':>16}{'ESS/1k evals':>18}"
+          f"{'hops/1k steps':>17}{'longest dwell':>17}")
+    for sampler in BUDGET:
+        group = [r for rep in all_rows for r in rep if r["sampler"] == sampler]
+
+        def ms(key, digits=1):
+            vals = np.array([r[key] for r in group], dtype=float)
+            sd = vals.std(ddof=1) if vals.size > 1 else 0.0
+            return f"{vals.mean():.{digits}f} +- {sd:.{digits}f}"
+
+        print(f"{sampler:<8}{ms('ESS(x0)', 0):>16}{ms('ESS per 1k evals'):>18}"
+              f"{ms('hops per 1k steps'):>17}{ms('longest dwell', 0):>17}")
+
+
+def write_csv(all_rows, steps) -> None:
+    columns = ["sampler", "seed", "steps", "cost_per_step", "tuned_step_size", "acceptance",
+               "ESS_x0", "ESS_per_1k_steps", "ESS_per_1k_evals", "hops", "hops_per_1k_steps",
+               "hops_per_1k_evals", "longest_dwell", "mean_x0", "std_x0"]
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(columns)
+        for rep_index, rows in enumerate(all_rows):
+            for r in rows:
+                writer.writerow([
+                    r["sampler"], rep_index, r["steps"], r["cost per step"], steps[r["sampler"]],
+                    f"{r['acceptance']:.6f}", f"{r['ESS(x0)']:.3f}",
+                    f"{r['ESS per 1k steps']:.3f}", f"{r['ESS per 1k evals']:.3f}",
+                    r["mode hops"], f"{r['hops per 1k steps']:.4f}",
+                    f"{r['hops per 1k evals']:.4f}", r["longest dwell"],
+                    f"{r['mean x0']:.6f}", f"{r['std x0']:.6f}",
+                ])
+    print(f"\nper-seed results written to {CSV_PATH}")
+
+
+def write_figures(target: DoubleWell, chains, rows, steps) -> None:
+    by_name = {r["sampler"]: r for r in rows}
 
     # --- figure 1: trace plots -------------------------------------------------
     fig, axes = plt.subplots(3, 1, figsize=(10, 7), sharex=False)
     for ax, chain in zip(axes, chains):
         x0 = chain.samples[:, 0]
         window = min(5_000, len(x0))
-        step_axis = np.arange(window)
-        ax.plot(step_axis, x0[:window], lw=0.6, color="#2c5282")
+        r = by_name[chain.name]
+        ax.plot(np.arange(window), x0[:window], lw=0.6, color="#2c5282")
         ax.axhline(0.0, color="#a0aec0", lw=0.8, ls="--")
         ax.set_ylabel("$x_0$")
-        ax.set_title(f"{chain.name}: acceptance {chain.acceptance_rate:.2f}, "
-                     f"{summarize([chain], target)[0]['mode hops']} barrier crossings in "
-                     f"{chain.n_steps:,} steps (first {window:,} shown)",
+        ax.set_title(f"{chain.name}: acceptance {r['acceptance']:.2f}, "
+                     f"{r['hops per 1k steps']:.1f} barrier crossings per 1k steps "
+                     f"({r['mode hops']:,} in {r['steps']:,} steps, first {window:,} shown)",
                      fontsize=10, loc="left")
     axes[-1].set_xlabel("iteration")
     fig.suptitle("Trace plots: how a chain actually explores a bimodal target", fontsize=12)
@@ -112,7 +208,8 @@ def main() -> None:
         ax.set_ylim(-2.6, 2.6)
         ax.set_xlabel("$x_0$")
     axes[0].set_ylabel("$x_1$")
-    fig.suptitle("Samples (blue) against the true unnormalised density (red contours)", fontsize=12)
+    fig.suptitle("Samples (blue) against the true unnormalised density (red contours)",
+                 fontsize=12)
     fig.tight_layout()
     fig.savefig(FIGDIR / "01_samples.png", dpi=150)
     plt.close(fig)
@@ -122,19 +219,20 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(7.5, 4.8))
     for colour, (label, fn, kw, n) in zip(
         ["#c53030", "#2b6cb0", "#2f855a"],
-        [("RWM", random_walk_metropolis, dict(step_size=step_rwm), 50_000),
-         ("MALA", mala, dict(step_size=step_mala), 50_000),
-         ("HMC", hamiltonian_monte_carlo, dict(step_size=step_hmc, n_leapfrog=10), 20_000)],
+        [("RWM", random_walk_metropolis, dict(step_size=steps["RWM"]), 50_000),
+         ("MALA", mala, dict(step_size=steps["MALA"]), 50_000),
+         ("HMC", hamiltonian_monte_carlo,
+          dict(step_size=steps["HMC"], n_leapfrog=N_LEAPFROG), 20_000)],
     ):
-        hops = []
+        rates = []
         for h in barriers:
             t = DoubleWell(a=target.a, h=h, omega=target.omega)
             chain = fn(t, n_steps=n, seed=7, **kw)
-            hops.append(summarize([chain], t)[0]["mode hops"])
-        ax.plot([DoubleWell(a=target.a, h=h).barrier for h in barriers], hops,
+            rates.append(summarize([chain], t)[0]["hops per 1k steps"])
+        ax.plot([DoubleWell(a=target.a, h=h).barrier for h in barriers], rates,
                 marker="o", color=colour, label=label)
     ax.set_xlabel("barrier height (energy units)")
-    ax.set_ylabel("barrier crossings in a fixed budget")
+    ax.set_ylabel("barrier crossings per 1k steps")
     ax.set_title("Raise the barrier and the cheap samplers stop exploring:\n"
                  "the spectral gap closing, made measurable")
     ax.legend(frameon=False)
@@ -142,7 +240,39 @@ def main() -> None:
     fig.savefig(FIGDIR / "01_barrier_scan.png", dpi=150)
     plt.close(fig)
 
-    print(f"\nfigures written to {FIGDIR}")
+    print(f"figures written to {FIGDIR}")
+
+
+def main() -> None:
+    args = parse_args()
+    FIGDIR.mkdir(exist_ok=True)
+    target = DoubleWell()
+    print(f"target: {target.name}, barrier height = {target.barrier:.2f}")
+    print("cost convention: one log-density and one gradient both cost 1 unit "
+          f"(RWM 1, MALA 3, HMC {N_LEAPFROG + 2} per iteration)")
+
+    steps = tune_step_sizes(target)
+    print(f"tuned step sizes: RWM {steps['RWM']}, MALA {steps['MALA']}, "
+          f"HMC {steps['HMC']} (L = {N_LEAPFROG})")
+
+    reps = max(1, args.seeds)
+    all_rows = []
+    first_chains = None
+    for rep in range(reps):
+        chains = run_replicate(target, steps, rep)
+        all_rows.append(summarize(chains, target))
+        if first_chains is None:
+            first_chains = chains
+
+    print_efficiency_table(all_rows[0])
+    print_exploration_table(all_rows[0])
+    if reps > 1:
+        print_seed_summary(all_rows)
+
+    write_csv(all_rows, steps)
+
+    if not args.skip_figures:
+        write_figures(target, first_chains, all_rows[0], steps)
 
 
 if __name__ == "__main__":
