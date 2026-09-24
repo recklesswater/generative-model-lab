@@ -1,7 +1,7 @@
 """Run the three samplers on the double well and write the diagnostics to figures/.
 
 Usage:
-    python 01_mcmc_toy/run_demo.py                # one seed: tables + figures (~20 s)
+python 01_mcmc_toy/run_demo.py                # one seed: tables + figures (~1 min)
     python 01_mcmc_toy/run_demo.py --seeds 5      # repeat the protocol, report mean +- sd
     python 01_mcmc_toy/run_demo.py --seeds 5 --skip-figures
 

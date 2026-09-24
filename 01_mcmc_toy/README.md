@@ -4,8 +4,8 @@ Three samplers, one bimodal target, no hidden machinery. Every number in this fi
 by the scripts in this directory and can be reproduced by running them.
 
 ```bash
-python 01_mcmc_toy/run_demo.py                            # one seed: tables + figures (~45 s)
-python 01_mcmc_toy/run_demo.py --seeds 10 --skip-figures  # mean +- sd, writes the CSV (~100 s)
+python 01_mcmc_toy/run_demo.py                            # one seed: tables + figures (~1 min)
+python 01_mcmc_toy/run_demo.py --seeds 10 --skip-figures  # mean +- sd, writes the CSV (~2-3 min)
 python 01_mcmc_toy/show_one_step.py                       # one step of each sampler, in full
 ```
 

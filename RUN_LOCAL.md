@@ -152,7 +152,8 @@ PNG，如果哪天图变大了（比如换数据集、调高 dpi），仓库会�
 | `.github/workflows/ci.yml` | 01 改为 `--seeds 3`，并新增 `show_one_step.py` 一步（自校验即冒烟测试） |
 | `README.md`（根） | 模块 01 的描述改成与实测一致 |
 
-### 本机 10 种子实测（`python 01_mcmc_toy/run_demo.py --seeds 10 --skip-figures`，约 100 s）
+### 10 种子实测（`python 01_mcmc_toy/run_demo.py --seeds 10 --skip-figures`，约 2–3 min，随 CPU 波动；
+同一命令在两台机器上跑出的 `outputs_mcmc_summary.csv` 已核对为**逐字节一致**）
 
 | sampler | ESS(x0) | ESS / 1k evals | hops / 1k steps | longest dwell |
 | --- | --- | --- | --- | --- |
