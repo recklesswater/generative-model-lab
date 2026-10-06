@@ -18,11 +18,18 @@ That question is asked three times, at three different levels of structure:
 | [`02_diffusion_toy`](02_diffusion_toy/) | samples from 2D toy densities (two-moons, 8-gaussians) | 2D, diffusion | ✅ runnable |
 | [`03_omics_synthesis`](03_omics_synthesis/) | **synthetic patients** for small-sample omics cohorts | tabular, ~10²–10³ | 🚧 v0 demo |
 | [`04_se3_diffusion`](04_se3_diffusion/) | **protein-backbone-like frames** on SE(3), with property guidance | 3D rigid-body | 🚧 v0 demo |
+| [`05_spectral_view`](05_spectral_view/) | **the operators behind 01–04**: the noising step, the denoiser, the guidance term | linear algebra | ✅ runnable |
 
 Nothing here is a research contribution, and nothing here is a wrapper around someone else's
 checkpoint. The modules are deliberately small enough to be read end to end — the point is to make
 the mechanics visible: the noise process, the score, the equivariance, the operating point, and the
 external validation.
+
+Module 05 is the one that looks at the machinery instead of the output: it treats the forward
+noising step as a linear operator (and computes its spectrum), the MMSE denoiser as an orthogonal
+projection (and measures the residual's inner products), and guidance as the gradient of a
+functional (and shows what a linear versus a radial functional does). It is the linear-algebra
+reading of modules 01, 02 and 04.
 
 ## Quickstart
 
@@ -37,6 +44,11 @@ python 02_diffusion_toy/run_demo.py
 
 # 04: SO(3)/SE(3) frames, an equivariance test, and property-guided sampling
 python 04_se3_diffusion/run_demo.py
+
+# 05: the linear-algebra reading of the modules above (operators, projections, functionals)
+python 05_spectral_view/spectral_forward.py
+python 05_spectral_view/projection_demo.py
+python 05_spectral_view/guidance_functionals.py
 
 # 03: small-sample omics augmentation, demo mode (no download needed)
 python 03_omics_synthesis/run_experiment.py --demo

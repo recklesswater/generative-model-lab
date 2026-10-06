@@ -37,6 +37,12 @@ jobs:
       - name: Omics augmentation demo (module 03)
         run: python 03_omics_synthesis/run_experiment.py --demo --seeds 0 1
 
+      - name: Spectral view - operators, projections, functionals (module 05)
+        run: |
+          python 05_spectral_view/spectral_forward.py
+          python 05_spectral_view/projection_demo.py
+          python 05_spectral_view/guidance_functionals.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: figures
