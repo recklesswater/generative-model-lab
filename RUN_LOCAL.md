@@ -195,3 +195,32 @@ PNG，如果哪天图变大了（比如换数据集、调高 dpi），仓库会�
 3. **replica exchange / 并行回火**：能否救回高势垒的跨井率，代价多少。
 4. **故意写错的采样器**：去掉 MALA 的反向提议项，偏差在轨迹图上看不出来、在样本云上一眼
    看出——和模块 02 的"loss 收敛但分布错"是同一课。
+
+---
+
+## 2026-10-13：模块 06（Krylov + MCMC，让轨迹自己交出反应坐标）
+
+CI 新增三步，本机实测：
+
+```powershell
+python 06_krylov_mcmc/krylov_basics.py      # ~2 s
+python 06_krylov_mcmc/cv_discovery.py       # ~13 s
+python 06_krylov_mcmc/dimension_scan.py     # ~30 s
+```
+
+依赖只有 numpy + matplotlib（三维坐标轴用 matplotlib 自带的 mpl_toolkits），采样器和诊断
+直接从 `01_mcmc_toy` 导入，所以不需要新装任何包。
+
+看结论的顺序：
+
+| 想看什么 | 看哪一节 |
+| --- | --- |
+| 为什么不能用方差挑反应坐标 | `cv_discovery.py` 第 4 节的对照表（Krylov 3.45° vs 主成分 64.9°） |
+| Krylov 截断是不是误差来源 | 同节里的 `Krylov dim m` 扫描（m=2 与 m=8 只差 0.0003°） |
+| 维度本身会不会毁掉方法 | `dimension_scan.py` 第 1-2 节（d=2…20 角度平坦） |
+| 真正的失效边界在哪 | `dimension_scan.py` 第 3 节（kappa 扫描，时标比 t1/t2 趋近 1 时角度崩到 34°） |
+| 三维能画成什么样 | `figures/06_krylov_cv_3d.png` |
+| 用错 Lanczos 会怎样 | `krylov_basics.py` 第 5 节（非对称算子：误差 0.46，且完全不报错） |
+
+注意 `cv_discovery.py --skip-figures` 会把 d=3 那条交叉验证链也一起跳过（它在 `figure_3d()`
+内部），所以想在 CI 里省时间可以放心加。

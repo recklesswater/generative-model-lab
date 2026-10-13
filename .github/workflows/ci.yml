@@ -43,6 +43,12 @@ jobs:
           python 05_spectral_view/projection_demo.py
           python 05_spectral_view/guidance_functionals.py
 
+      - name: Krylov + MCMC - operator checks, CV discovery, dimension scan (module 06)
+        run: |
+          python 06_krylov_mcmc/krylov_basics.py
+          python 06_krylov_mcmc/cv_discovery.py
+          python 06_krylov_mcmc/dimension_scan.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: figures

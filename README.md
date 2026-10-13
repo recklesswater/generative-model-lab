@@ -19,6 +19,7 @@ That question is asked three times, at three different levels of structure:
 | [`03_omics_synthesis`](03_omics_synthesis/) | **synthetic patients** for small-sample omics cohorts | tabular, ~10²–10³ | 🚧 v0 demo |
 | [`04_se3_diffusion`](04_se3_diffusion/) | **protein-backbone-like frames** on SE(3), with property guidance | 3D rigid-body | 🚧 v0 demo |
 | [`05_spectral_view`](05_spectral_view/) | **the operators behind 01–04**: the noising step, the denoiser, the guidance term | linear algebra | ✅ runnable |
+| [`06_krylov_mcmc`](06_krylov_mcmc/) | **the reaction coordinate** a d-dimensional density implies, recovered from the chain itself | d-dimensional, sampling | ✅ runnable |
 
 Nothing here is a research contribution, and nothing here is a wrapper around someone else's
 checkpoint. The modules are deliberately small enough to be read end to end — the point is to make
@@ -49,6 +50,11 @@ python 04_se3_diffusion/run_demo.py
 python 05_spectral_view/spectral_forward.py
 python 05_spectral_view/projection_demo.py
 python 05_spectral_view/guidance_functionals.py
+
+# 06: the reaction coordinate derived from the dynamics rather than chosen by hand (Krylov + MCMC)
+python 06_krylov_mcmc/krylov_basics.py
+python 06_krylov_mcmc/cv_discovery.py
+python 06_krylov_mcmc/dimension_scan.py
 
 # 03: small-sample omics augmentation, demo mode (no download needed)
 python 03_omics_synthesis/run_experiment.py --demo
@@ -100,6 +106,19 @@ $$f(Q \cdot T) = Q \cdot f(T) \quad \text{for a random global rotation } Q$$
 
 and a small property-guided sampler (push two residues together, avoid clashes) — which is the
 mechanism that conditional structure generation (motif scaffolding, binder design) is built on.
+
+### 06 — Krylov + MCMC: let the chain pick the reaction coordinate
+
+Enhanced sampling needs a collective variable, and it normally gets one by hand — a distance, an
+angle, an RMSD. This module derives it instead: estimate a transfer operator from the trajectory,
+take its leading eigenvector, and check it three ways against a target whose answer is known exactly.
+The operator is never formed — a Lanczos run only applies it — and the headline numbers are that the
+CV lands 3.45 degrees from the true direction (top principal component: 64.9) and recovers 96 percent
+of the barrier (PCA: 0 percent), in eight dimensions, with the barrier along a dense random direction
+that no coordinate axis can see. The honest half is the dimension scan: d = 2 … 20 does not break it,
+a shrinking spectral gap does, and the ratio to watch is readable in the Ritz spectrum before the
+answer is known. Lanczos and Arnoldi are transcribed from Golub & Van Loan and Trefethen & Bau, and
+the module README says so before it says anything else.
 
 ## Evaluation discipline (the part I care most about)
 

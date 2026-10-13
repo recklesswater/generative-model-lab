@@ -7,6 +7,8 @@ The repository is developed in the open, module by module: each module is pushed
 
 - [x] Repo skeleton, single evaluation philosophy across modules.
 - [x] `01_mcmc_toy`: RWM + MALA + diagnostics (trace, ACF, ESS, mode-hopping).
+- [x] `06_krylov_mcmc`: the collective variable derived from the chain itself (Lanczos on an
+      estimated transfer operator), the dimension scan, and the sweep showing where the method breaks.
 
 ## In progress
 
@@ -21,7 +23,9 @@ The repository is developed in the open, module by module: each module is pushed
       keep the MLP as an ablation.
 - [ ] `05_molecule_guidance`: property-guided generation on a MoleculeNet task (BBBP / ClinTox /
       TOX21), reported the same way as module 03 — internal vs scaffold split.
-- [ ] `06_spatial_omics` (long term): the same augmentation question on spatial transcriptomics
+- [ ] `06`: nonlinear features (distances, contacts, RBF) so that the collective variable is not
+      restricted to a linear map, plus an Arnoldi path for chains that are not reversible.
+- [ ] `07_spatial_omics` (long term): the same augmentation question on spatial transcriptomics
       (10x Visium), where the batch structure is spatial rather than tabular.
 - [ ] Reproducibility: pin the environment, add a `make all` that regenerates every figure.
 
